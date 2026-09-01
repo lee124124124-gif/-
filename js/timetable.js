@@ -117,12 +117,15 @@ const TimetableUI = (() => {
       const typeIcon = swap.type === 'exchange' ? '🔀' : '🔁';
       const makeupNote = (swap.type === 'substitute' && swap.makeup && swap.makeup.date)
         ? `<div class="daily-makeup-note">📘 보강 ${escapeHtml(formatShortDate(swap.makeup.date))}</div>` : '';
-      const chainCount = swap.type === 'substitute' ? Store.getSwapChain(classId, dayIdx, period, date).length : 1;
+      const chain = Store.getSwapChain(classId, dayIdx, period, date);
+      const chainCount = swap.type === 'substitute' ? chain.length : 1;
       const chainNote = chainCount > 1 ? `<div class="daily-chain-note">이 날짜에 ${chainCount}번 교체됨</div>` : '';
+      const before = base || (chain.length > 1 ? chain[chain.length - 2] : null);
+      const beforeText = before ? escapeHtml(before.subject) + ' · ' + escapeHtml(before.teacher) : '(빈 교시)';
       return `<div class="daily-row daily-swapped clickable" data-period="${period}">
         ${periodLabel}
         <div class="daily-content">
-          <div class="daily-before">${escapeHtml(base.subject)} · ${escapeHtml(base.teacher)}</div>
+          <div class="daily-before">${beforeText}</div>
           <div class="daily-badge">${typeIcon} ${escapeHtml(formatShortDate(swap.date))} 교체</div>
           <div class="daily-after">${escapeHtml(swap.subject)} · ${escapeHtml(swap.teacher)}</div>
           ${makeupNote}

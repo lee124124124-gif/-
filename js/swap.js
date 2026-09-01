@@ -151,24 +151,33 @@ const SwapUI = (() => {
         <div class="modal-body sheet-body">
           <p class="sheet-current">📘 ${TimetableUI.escapeHtml(swap.subject)} · ${TimetableUI.escapeHtml(swap.teacher)}</p>
           <p class="sheet-hint">${DAY_NAMES[swap.sourceDay]}요일 ${swap.sourcePeriod}교시(${formatShortDate(swap.sourceDate)}) 결강 수업의 보강입니다.${swap.note ? ' ' + TimetableUI.escapeHtml(swap.note) : ''}</p>
+          <button class="btn btn-block btn-primary" data-act="swap">🔁 이 보강 수업도 교체 (결강 대체)</button>
+          <button class="btn btn-block" data-act="exchange">🔀 같은 날 다른 교시와 교체</button>
           <button class="btn btn-block btn-danger" data-act="revert">↩ 보강 표시 취소</button>
         </div>
       `;
       ModalUI.open(html);
+      document.querySelector('[data-act="swap"]').addEventListener('click', () => openSwapModal(classId, day, period, date, false));
+      document.querySelector('[data-act="exchange"]').addEventListener('click', () => openExchangeModal(classId, day, period, date));
       document.querySelector('[data-act="revert"]').addEventListener('click', () => revertSwap(classId, day, period, date));
       return;
     }
 
     const base = Store.getBaseCell(classId, day, period);
     const isExchange = swap.type === 'exchange';
+    const chain = Store.getSwapChain(classId, day, period, date);
 
     if (isExchange) {
+      const beforeLatest = base || (chain.length > 1 ? chain[chain.length - 2] : null);
+      const beforeLatestText = beforeLatest
+        ? `${TimetableUI.escapeHtml(beforeLatest.subject)} · ${TimetableUI.escapeHtml(beforeLatest.teacher)}`
+        : '(빈 교시)';
       const html = `
         <div class="modal-header"><h3>${className(classId)} · ${DAY_NAMES[day]}요일 ${period}교시 (${formatShortDate(date)} 교체됨)</h3>
           <button class="btn-close" data-close>✕</button></div>
         <div class="modal-body sheet-body">
           <p class="sheet-current">
-            <s>${TimetableUI.escapeHtml(base.subject)} · ${TimetableUI.escapeHtml(base.teacher)}</s><br>
+            <s>${beforeLatestText}</s><br>
             → ${TimetableUI.escapeHtml(swap.subject)} · ${TimetableUI.escapeHtml(swap.teacher)}
           </p>
           <p class="sheet-hint">${DAY_NAMES[swap.partnerDay]}요일 ${swap.partnerPeriod}교시와 서로 교체되었습니다. (교체일지 작성 불필요)</p>
@@ -180,8 +189,10 @@ const SwapUI = (() => {
       return;
     }
 
-    const chain = Store.getSwapChain(classId, day, period, date);
-    const trail = [`<s>${TimetableUI.escapeHtml(base.subject)} · ${TimetableUI.escapeHtml(base.teacher)}</s>`]
+    const trueBaseText = base
+      ? `${TimetableUI.escapeHtml(base.subject)} · ${TimetableUI.escapeHtml(base.teacher)}`
+      : '(빈 교시)';
+    const trail = [`<s>${trueBaseText}</s>`]
       .concat(chain.map((s, i) => {
         const text = `${TimetableUI.escapeHtml(s.subject)} · ${TimetableUI.escapeHtml(s.teacher)}`;
         return i === chain.length - 1 ? `<b>${text}</b>` : `<s>${text}</s>`;
@@ -440,6 +451,8 @@ const SwapUI = (() => {
 
   function openExchangeModal(classId, day, period, date) {
     const base = Store.getBaseCell(classId, day, period);
+    const currentSwap = Store.getSwap(classId, day, period, date);
+    const effective = currentSwap || base;
     const periodCount = Store.get().settings.periodCount;
     const candidates = [];
     for (let p = 1; p <= periodCount; p++) {
@@ -460,7 +473,7 @@ const SwapUI = (() => {
       <div class="modal-header"><h3>${className(classId)} · ${formatShortDate(date)}(${DAY_NAMES[day]}) ${period}교시 - 같은 날 교체</h3>
         <button class="btn-close" data-close>✕</button></div>
       <div class="modal-body">
-        <p class="sheet-current">기존: ${TimetableUI.escapeHtml(base.subject)} · ${TimetableUI.escapeHtml(base.teacher)}</p>
+        <p class="sheet-current">기존: ${TimetableUI.escapeHtml(effective.subject)} · ${TimetableUI.escapeHtml(effective.teacher)}</p>
         <label>바꿀 교시 (같은 ${DAY_NAMES[day]}요일)
           <select id="f-target-period">${optionsHtml}</select>
         </label>
@@ -475,7 +488,7 @@ const SwapUI = (() => {
     document.getElementById('btn-save').addEventListener('click', () => {
       const swapDate = date;
       const targetPeriod = Number(document.getElementById('f-target-period').value);
-      if (Store.getSwap(classId, day, period, swapDate) || Store.getSwap(classId, day, targetPeriod, swapDate)) {
+      if (Store.getSwap(classId, day, targetPeriod, swapDate)) {
         alert('이미 해당 날짜에 교체 기록이 있는 교시입니다. 먼저 기존 교체를 취소해주세요.');
         return;
       }
@@ -488,7 +501,7 @@ const SwapUI = (() => {
       });
       Store.pushSwap(classId, day, targetPeriod, swapDate, {
         id: swapId, type: 'exchange', date: swapDate,
-        subject: base.subject, teacher: base.teacher,
+        subject: effective.subject, teacher: effective.teacher,
         partnerDay: day, partnerPeriod: period
       });
       ModalUI.close();
