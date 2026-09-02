@@ -1,19 +1,34 @@
 const SwapLog = (() => {
   const MAX_ROWS = 5;
 
+  function findGroupableLog(headerDefaults) {
+    return Store.get().logs.find(l =>
+      l.periodStart === headerDefaults.date &&
+      l.periodEnd === headerDefaults.date &&
+      l.absentTeacher === headerDefaults.absentTeacher &&
+      l.reason === headerDefaults.reason &&
+      l.rows.length < MAX_ROWS
+    ) || null;
+  }
+
   function attachSwapRow(rowData, headerDefaults) {
-    const log = {
-      id: uid(),
-      reason: headerDefaults.reason,
-      periodStart: headerDefaults.date,
-      periodEnd: headerDefaults.date,
-      absentTeacher: headerDefaults.absentTeacher,
-      note: '',
-      rows: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-    Store.addLog(log);
+    // 같은 날짜·같은 결강교사·같은 사유로 이미 작성 중인 일지가 있으면 새 행으로 이어붙이고,
+    // 없으면(예: 같은 슬롯을 다시 교체하는 경우) 새 일지를 만든다.
+    let log = findGroupableLog(headerDefaults);
+    if (!log) {
+      log = {
+        id: uid(),
+        reason: headerDefaults.reason,
+        periodStart: headerDefaults.date,
+        periodEnd: headerDefaults.date,
+        absentTeacher: headerDefaults.absentTeacher,
+        note: '',
+        rows: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      Store.addLog(log);
+    }
     const row = { id: uid(), ...rowData };
     Store.updateLog(log.id, l => { l.rows.push(row); });
     return { logId: log.id, rowId: row.id };
