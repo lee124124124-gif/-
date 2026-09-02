@@ -41,6 +41,10 @@ const SwapLog = (() => {
     });
   }
 
+  function updateHeader(logId, patch) {
+    Store.updateLog(logId, l => { Object.assign(l, patch); });
+  }
+
   function removeRow(logId, rowId) {
     const log = Store.getLog(logId);
     if (!log) return;
@@ -345,5 +349,5 @@ const SwapLog = (() => {
     `;
   }
 
-  return { attachSwapRow, updateRow, removeRow, createBlank, reasonOptions, renderList, openDetail, printLog };
+  return { attachSwapRow, updateRow, updateHeader, removeRow, createBlank, reasonOptions, renderList, openDetail, printLog };
 })();

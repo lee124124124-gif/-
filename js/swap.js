@@ -434,6 +434,7 @@ const SwapUI = (() => {
           substituteTeacher: teacher,
           makeup
         });
+        if (existing.reason !== reason) SwapLog.updateHeader(existing.logId, { reason });
         if (existing.makeup) removeMakeupMarker(classId, existing.id, day, period, swapDate, existing.makeup);
         record = { ...existing, reason, subject, teacher, grade, makeup };
         Store.replaceLastSwap(classId, day, period, swapDate, record);
