@@ -106,8 +106,23 @@ const SwapUI = (() => {
       const teacher = document.getElementById('f-teacher').value.trim();
       if (!subject || !teacher) { alert('과목과 담당 선생님을 입력해주세요.'); return; }
       Store.setBaseCell(classId, day, period, { subject, teacher });
+      if (subject !== base.subject) {
+        syncBaseRenameToLogs(classId, day, period, subject);
+      }
       ModalUI.close();
       TimetableUI.renderBase();
+    });
+  }
+
+  // 기본 시간표의 과목 이름이 바뀌면, 그 자리에서 바로 만들어진(체인의 첫 교체) 결강 대체 기록의
+  // 교체일지 행("결강과목")도 새 이름으로 함께 갱신한다. (결강교사 헤더는 여러 행이 공유할 수 있어
+  // 이 칸 하나만 바뀌었다고 문서 전체를 바꾸면 다른 행과 어긋날 수 있으므로 건드리지 않는다.)
+  function syncBaseRenameToLogs(classId, day, period, newSubject) {
+    const swapsByDate = Store.getSwapsForCell(classId, day, period);
+    Object.values(swapsByDate).forEach(chain => {
+      const first = chain[0];
+      if (!first || first.type !== 'substitute' || !first.logId || !first.rowId) return;
+      SwapLog.updateRow(first.logId, first.rowId, { cancelledSubject: newSubject });
     });
   }
 
