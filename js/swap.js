@@ -181,10 +181,14 @@ const SwapUI = (() => {
             → ${TimetableUI.escapeHtml(swap.subject)} · ${TimetableUI.escapeHtml(swap.teacher)}
           </p>
           <p class="sheet-hint">${DAY_NAMES[swap.partnerDay]}요일 ${swap.partnerPeriod}교시와 서로 교체되었습니다. (교체일지 작성 불필요)</p>
-          <button class="btn btn-block btn-danger" data-act="revert">↩ 교체 취소(원래대로)</button>
+          <button class="btn btn-block btn-primary" data-act="swap">🔁 이 수업도 교체 (결강 대체)</button>
+          <button class="btn btn-block" data-act="exchange">🔀 같은 날 다른 교시와 또 교체</button>
+          <button class="btn btn-block btn-danger" data-act="revert">↩ 마지막 교체 취소</button>
         </div>
       `;
       ModalUI.open(html);
+      document.querySelector('[data-act="swap"]').addEventListener('click', () => openSwapModal(classId, day, period, date, false));
+      document.querySelector('[data-act="exchange"]').addEventListener('click', () => openExchangeModal(classId, day, period, date));
       document.querySelector('[data-act="revert"]').addEventListener('click', () => revertSwap(classId, day, period, date));
       return;
     }
@@ -232,7 +236,10 @@ const SwapUI = (() => {
           SwapLog.removeRow(swap.logId, swap.rowId);
           if (swap.makeup) removeMakeupMarker(classId, swap.id, day, period, date, swap.makeup);
         } else if (swap.type === 'exchange') {
-          Store.removeSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+          const partnerLatest = Store.getSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+          if (partnerLatest && partnerLatest.id === swap.id) {
+            Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+          }
         } else if (swap.type === 'makeup') {
           clearMakeupLinkFromSource(classId, swap);
         }
@@ -255,19 +262,22 @@ const SwapUI = (() => {
       return;
     }
     const chain = Store.getSwapChain(classId, day, period, date);
+    const multiStep = chain.length > 1;
     const confirmMsg = swap.type === 'substitute'
-      ? (chain.length > 1
+      ? (multiStep
         ? '마지막 교체만 취소하고 그 이전 상태로 되돌릴까요? 교체일지의 해당 행도 함께 삭제됩니다.'
         : '교체를 취소하고 원래 수업으로 되돌릴까요? 교체일지의 해당 행도 함께 삭제됩니다.')
-      : '교체를 취소하고 원래 수업으로 되돌릴까요?';
+      : (multiStep
+        ? '마지막 교체만 취소하고 그 이전 상태로 되돌릴까요?'
+        : '교체를 취소하고 원래 수업으로 되돌릴까요?');
     if (!confirm(confirmMsg)) return;
     if (swap.type === 'substitute') {
       SwapLog.removeRow(swap.logId, swap.rowId);
       if (swap.makeup) removeMakeupMarker(classId, swap.id, day, period, date, swap.makeup);
       Store.popSwap(classId, day, period, date);
     } else {
-      Store.removeSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
-      Store.removeSwap(classId, day, period, date);
+      Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+      Store.popSwap(classId, day, period, date);
     }
     ModalUI.close();
     TimetableUI.renderDaily();
