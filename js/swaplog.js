@@ -1,8 +1,9 @@
 const SwapLog = (() => {
   const MAX_ROWS = 5;
 
-  function findGroupableLog(headerDefaults) {
+  function findGroupableLog(headerDefaults, excludeLogId) {
     return Store.get().logs.find(l =>
+      l.id !== excludeLogId &&
       l.periodStart === headerDefaults.date &&
       l.periodEnd === headerDefaults.date &&
       l.absentTeacher === headerDefaults.absentTeacher &&
@@ -41,8 +42,42 @@ const SwapLog = (() => {
     });
   }
 
-  function updateHeader(logId, patch) {
-    Store.updateLog(logId, l => { Object.assign(l, patch); });
+  // 교체 사유가 바뀌었을 때, 날짜·결강교사·(새) 사유가 같은 다른 일지가 있으면 그 일지로 행을 옮겨 합치고
+  // (마지막 행이면 원래 일지는 삭제), 없으면 새 일지로 분리하거나(다른 행이 남아있는 경우) 제자리에서 사유만
+  // 바꾼다(혼자 있는 행인 경우).
+  function relocateRowForReason(oldLogId, rowId, headerDefaults) {
+    const oldLog = Store.getLog(oldLogId);
+    if (!oldLog) return { logId: oldLogId, rowId };
+    const row = oldLog.rows.find(r => r.id === rowId);
+    if (!row) return { logId: oldLogId, rowId };
+
+    const mergeTarget = findGroupableLog(headerDefaults, oldLogId);
+
+    if (!mergeTarget && oldLog.rows.length === 1) {
+      Store.updateLog(oldLogId, l => { l.reason = headerDefaults.reason; });
+      return { logId: oldLogId, rowId };
+    }
+
+    Store.updateLog(oldLogId, l => { l.rows = l.rows.filter(r => r.id !== rowId); });
+    if (Store.getLog(oldLogId).rows.length === 0) Store.removeLog(oldLogId);
+
+    let target = mergeTarget;
+    if (!target) {
+      target = {
+        id: uid(),
+        reason: headerDefaults.reason,
+        periodStart: headerDefaults.date,
+        periodEnd: headerDefaults.date,
+        absentTeacher: headerDefaults.absentTeacher,
+        note: '',
+        rows: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      Store.addLog(target);
+    }
+    Store.updateLog(target.id, l => { l.rows.push(row); });
+    return { logId: target.id, rowId: row.id };
   }
 
   function removeRow(logId, rowId) {
@@ -349,5 +384,5 @@ const SwapLog = (() => {
     `;
   }
 
-  return { attachSwapRow, updateRow, updateHeader, removeRow, createBlank, reasonOptions, renderList, openDetail, printLog };
+  return { attachSwapRow, updateRow, relocateRowForReason, removeRow, createBlank, reasonOptions, renderList, openDetail, printLog };
 })();

@@ -434,9 +434,15 @@ const SwapUI = (() => {
           substituteTeacher: teacher,
           makeup
         });
-        if (existing.reason !== reason) SwapLog.updateHeader(existing.logId, { reason });
+        let logId = existing.logId;
+        if (existing.reason !== reason) {
+          const moved = SwapLog.relocateRowForReason(existing.logId, existing.rowId, {
+            reason, date: swapDate, absentTeacher: previousEffective.teacher
+          });
+          logId = moved.logId;
+        }
         if (existing.makeup) removeMakeupMarker(classId, existing.id, day, period, swapDate, existing.makeup);
-        record = { ...existing, reason, subject, teacher, grade, makeup };
+        record = { ...existing, reason, subject, teacher, grade, makeup, logId };
         Store.replaceLastSwap(classId, day, period, swapDate, record);
       } else {
         const result = SwapLog.attachSwapRow(
