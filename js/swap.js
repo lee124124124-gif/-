@@ -300,26 +300,31 @@ const SwapUI = (() => {
 
   const MANUAL_VALUE = '__manual__';
 
-  function subjectOptionsForDay(classId, dayIdx) {
+  // date가 주어지면 그 날짜에 실제로 표시되는 내용(이미 교체/보강된 경우 그 결과)을 우선 사용하고,
+  // 없으면 기본 시간표 값을 사용한다. 대체할 과목 후보가 "이미 지나간 원래 과목"이 아니라 "그날 실제로
+  // 진행되는 과목"이 되도록 하기 위함이다.
+  function subjectOptionsForDay(classId, dayIdx, date) {
     const periodCount = Store.get().settings.periodCount;
     const opts = [];
     for (let p = 1; p <= periodCount; p++) {
-      const b = Store.getBaseCell(classId, dayIdx, p);
-      if (b) opts.push({ period: p, subject: b.subject, teacher: b.teacher });
+      const base = Store.getBaseCell(classId, dayIdx, p);
+      const swap = date ? Store.getSwap(classId, dayIdx, p, date) : null;
+      const effective = swap || base;
+      if (effective) opts.push({ period: p, subject: effective.subject, teacher: effective.teacher });
     }
     return opts;
   }
 
-  function findDayForSubject(classId, subject, teacher) {
+  function findDayForSubject(classId, subject, teacher, date) {
     if (!subject) return -1;
     for (let d = 0; d < DAY_NAMES.length; d++) {
-      if (subjectOptionsForDay(classId, d).some(o => o.subject === subject && o.teacher === teacher)) return d;
+      if (subjectOptionsForDay(classId, d, date).some(o => o.subject === subject && o.teacher === teacher)) return d;
     }
     return -1;
   }
 
-  function refreshSubjectSelect(classId, dayIdx, presetSubject, presetTeacher, fallbackPeriod) {
-    const opts = subjectOptionsForDay(classId, dayIdx);
+  function refreshSubjectSelect(classId, dayIdx, presetSubject, presetTeacher, fallbackPeriod, date) {
+    const opts = subjectOptionsForDay(classId, dayIdx, date);
     const select = document.getElementById('f-subject-select');
     const optionsHtml = opts.map(o =>
       `<option value="${o.period}||${TimetableUI.escapeHtml(o.subject)}||${TimetableUI.escapeHtml(o.teacher)}">${o.period}교시 · ${TimetableUI.escapeHtml(o.subject)} · ${TimetableUI.escapeHtml(o.teacher)}</option>`
@@ -373,7 +378,7 @@ const SwapUI = (() => {
       : (latestSwap || base);
     const existingMakeup = existing && existing.makeup;
     const initialSourceDay = existing
-      ? (() => { const found = findDayForSubject(classId, existing.subject, existing.teacher); return found >= 0 ? found : day; })()
+      ? (() => { const found = findDayForSubject(classId, existing.subject, existing.teacher, date); return found >= 0 ? found : day; })()
       : day;
 
     const html = `
@@ -408,9 +413,9 @@ const SwapUI = (() => {
     `;
     ModalUI.open(html, 'modal-wide');
 
-    refreshSubjectSelect(classId, initialSourceDay, existing ? existing.subject : '', existing ? existing.teacher : '', period);
+    refreshSubjectSelect(classId, initialSourceDay, existing ? existing.subject : '', existing ? existing.teacher : '', period, date);
     document.getElementById('f-source-day').addEventListener('change', (e) => {
-      refreshSubjectSelect(classId, Number(e.target.value), '', '', period);
+      refreshSubjectSelect(classId, Number(e.target.value), '', '', period, date);
     });
     document.getElementById('f-subject-select').addEventListener('change', (e) => {
       toggleManualFields(e.target.value === MANUAL_VALUE);
@@ -490,7 +495,9 @@ const SwapUI = (() => {
     for (let p = 1; p <= periodCount; p++) {
       if (p === period) continue;
       const b = Store.getBaseCell(classId, day, p);
-      if (b) candidates.push({ period: p, base: b });
+      const s = Store.getSwap(classId, day, p, date);
+      const eff = s || b;
+      if (eff) candidates.push({ period: p, base: eff });
     }
     if (!candidates.length) {
       alert('같은 요일에 과목이 등록된 다른 교시가 없습니다. 먼저 다른 교시에 과목을 추가해주세요.');
