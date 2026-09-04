@@ -62,9 +62,9 @@ body {
 .daily-swapped .daily-chain-note { font-size: 11px; color: #a06a00; margin-top: 3px; }
 
 .daily-makeup { background: #eaf1ff; border-color: #c7d9f7; }
+.daily-makeup .daily-before { color: #8a99b3; text-decoration: line-through; font-size: 12px; }
+.daily-makeup .daily-badge { font-size: 12px; color: #2b6ef2; margin: 3px 0; }
 .daily-makeup .daily-subject { font-weight: 700; font-size: 15px; color: #1f4fb0; }
-.daily-makeup .daily-badge { font-size: 12px; color: #2b6ef2; margin-top: 3px; }
-.daily-makeup .daily-makeup-displaced { font-size: 11px; color: #8a99b3; margin-top: 2px; }
 
 /* Date bar */
 .date-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 13px; color: #445; }

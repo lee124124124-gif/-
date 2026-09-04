@@ -46,6 +46,17 @@ function formatShortDate(dateStr) {
   return `${Number(parts[1])}/${Number(parts[2])}`;
 }
 
+// baseDateStr과 같은 주(월~금) 안에서 targetDayIdx(월=0..금=4)에 해당하는 날짜를 계산한다.
+// 다른 요일과 교체할 때 날짜 입력의 기본값을 자동으로 채워주기 위함이다.
+function nearestDateForWeekday(baseDateStr, targetDayIdx) {
+  const baseIdx = dateToWeekdayIndex(baseDateStr);
+  if (baseIdx < 0 || targetDayIdx < 0) return baseDateStr;
+  const d = new Date(baseDateStr + 'T00:00:00');
+  d.setDate(d.getDate() + (targetDayIdx - baseIdx));
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function todayStr() {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');

@@ -36,8 +36,43 @@ const AppUI = (() => {
       const log = SwapLog.createBlank();
       SwapLog.openDetail(log.id);
     });
+    document.getElementById('btn-export').addEventListener('click', () => {
+      const json = Store.exportState();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `수업교체앱_백업_${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+    document.getElementById('btn-import').addEventListener('click', () => {
+      document.getElementById('f-import-file').click();
+    });
+    document.getElementById('f-import-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!confirm('백업 파일을 불러오면 이 기기에 저장된 현재 데이터가 모두 파일 내용으로 덮어써집니다. 계속할까요?')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          Store.importState(reader.result);
+          TimetableUI.renderBase();
+          TimetableUI.renderDaily();
+          SwapLog.renderList();
+          alert('백업 파일을 불러왔습니다.');
+        } catch (err) {
+          alert(err.message || '파일을 불러오지 못했습니다.');
+        }
+      };
+      reader.readAsText(file);
+    });
     document.getElementById('btn-reset-semester').addEventListener('click', () => {
-      if (!confirm('학기말 초기화를 진행할까요?\n\n모든 학급의 "수업 교체" 기록이 삭제되고 기본 시간표(과목·담당 선생님)는 그대로 유지됩니다.\n이미 작성된 수업 교체일지 문서는 삭제되지 않습니다.')) return;
+      if (!confirm('학기말 초기화를 진행할까요?\n\n모든 학급의 기본 시간표(과목·담당 선생님)와 "수업 교체" 기록이 모두 삭제되어 빈 시간표로 돌아갑니다(학급 자체는 남아있습니다).\n이미 작성된 수업 교체일지 문서는 삭제되지 않습니다.')) return;
       Store.resetSemester();
       TimetableUI.renderBase();
       TimetableUI.renderDaily();

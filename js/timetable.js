@@ -103,15 +103,15 @@ const TimetableUI = (() => {
     }
 
     if (swap && swap.type === 'makeup') {
-      const displacedNote = base
-        ? `<div class="daily-makeup-displaced">(원래 ${escapeHtml(base.subject)} · ${escapeHtml(base.teacher)} 시간)</div>`
+      const displacedLine = base
+        ? `<div class="daily-before">${escapeHtml(base.subject)} · ${escapeHtml(base.teacher)}</div>`
         : '';
       return `<div class="daily-row daily-makeup clickable" data-period="${period}">
         ${periodLabel}
         <div class="daily-content">
-          <div class="daily-subject">📘 ${escapeHtml(swap.subject)} · ${escapeHtml(swap.teacher)} (보강)</div>
-          <div class="daily-badge">${DAY_NAMES[swap.sourceDay]}요일 ${swap.sourcePeriod}교시(${escapeHtml(formatShortDate(swap.sourceDate))}) 결강 보강</div>
-          ${displacedNote}
+          ${displacedLine}
+          <div class="daily-badge">📘 ${DAY_NAMES[swap.sourceDay]}요일 ${swap.sourcePeriod}교시(${escapeHtml(formatShortDate(swap.sourceDate))}) 결강 보강</div>
+          <div class="daily-subject">${escapeHtml(swap.subject)} · ${escapeHtml(swap.teacher)} (보강)</div>
         </div>
       </div>`;
     }

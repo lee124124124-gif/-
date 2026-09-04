@@ -150,7 +150,7 @@ const SwapUI = (() => {
       <div class="modal-body sheet-body">
         <p class="sheet-current">${TimetableUI.escapeHtml(base.subject)} · ${TimetableUI.escapeHtml(base.teacher)}</p>
         <button class="btn btn-block btn-primary" data-act="swap">🔁 수업 교체 (결강 대체)</button>
-        <button class="btn btn-block" data-act="exchange">🔀 같은 날 다른 교시와 교체</button>
+        <button class="btn btn-block" data-act="exchange">🔀 다른 교시와 교체</button>
       </div>
     `;
     ModalUI.open(html);
@@ -167,7 +167,7 @@ const SwapUI = (() => {
           <p class="sheet-current">📘 ${TimetableUI.escapeHtml(swap.subject)} · ${TimetableUI.escapeHtml(swap.teacher)}</p>
           <p class="sheet-hint">${DAY_NAMES[swap.sourceDay]}요일 ${swap.sourcePeriod}교시(${formatShortDate(swap.sourceDate)}) 결강 수업의 보강입니다.${swap.note ? ' ' + TimetableUI.escapeHtml(swap.note) : ''}</p>
           <button class="btn btn-block btn-primary" data-act="swap">🔁 이 보강 수업도 교체 (결강 대체)</button>
-          <button class="btn btn-block" data-act="exchange">🔀 같은 날 다른 교시와 교체</button>
+          <button class="btn btn-block" data-act="exchange">🔀 다른 교시와 교체</button>
           <button class="btn btn-block btn-danger" data-act="revert">↩ 보강 표시 취소</button>
         </div>
       `;
@@ -187,6 +187,8 @@ const SwapUI = (() => {
       const beforeLatestText = beforeLatest
         ? `${TimetableUI.escapeHtml(beforeLatest.subject)} · ${TimetableUI.escapeHtml(beforeLatest.teacher)}`
         : '(빈 교시)';
+      const partnerDate = swap.partnerDate || date;
+      const partnerDateText = partnerDate !== date ? `${formatShortDate(partnerDate)} ` : '';
       const html = `
         <div class="modal-header"><h3>${className(classId)} · ${DAY_NAMES[day]}요일 ${period}교시 (${formatShortDate(date)} 교체됨)</h3>
           <button class="btn-close" data-close>✕</button></div>
@@ -195,9 +197,9 @@ const SwapUI = (() => {
             <s>${beforeLatestText}</s><br>
             → ${TimetableUI.escapeHtml(swap.subject)} · ${TimetableUI.escapeHtml(swap.teacher)}
           </p>
-          <p class="sheet-hint">${DAY_NAMES[swap.partnerDay]}요일 ${swap.partnerPeriod}교시와 서로 교체되었습니다. (교체일지 작성 불필요)</p>
+          <p class="sheet-hint">${partnerDateText}${DAY_NAMES[swap.partnerDay]}요일 ${swap.partnerPeriod}교시와 서로 교체되었습니다. (교체일지 작성 불필요)</p>
           <button class="btn btn-block btn-primary" data-act="swap">🔁 이 수업도 교체 (결강 대체)</button>
-          <button class="btn btn-block" data-act="exchange">🔀 같은 날 다른 교시와 또 교체</button>
+          <button class="btn btn-block" data-act="exchange">🔀 다른 교시와 또 교체</button>
           <button class="btn btn-block btn-danger" data-act="revert">↩ 마지막 교체 취소</button>
         </div>
       `;
@@ -251,9 +253,10 @@ const SwapUI = (() => {
           SwapLog.removeRow(swap.logId, swap.rowId);
           if (swap.makeup) removeMakeupMarker(classId, swap.id, day, period, date, swap.makeup);
         } else if (swap.type === 'exchange') {
-          const partnerLatest = Store.getSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+          const partnerDate = swap.partnerDate || date;
+          const partnerLatest = Store.getSwap(classId, swap.partnerDay, swap.partnerPeriod, partnerDate);
           if (partnerLatest && partnerLatest.id === swap.id) {
-            Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+            Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, partnerDate);
           }
         } else if (swap.type === 'makeup') {
           clearMakeupLinkFromSource(classId, swap);
@@ -291,7 +294,8 @@ const SwapUI = (() => {
       if (swap.makeup) removeMakeupMarker(classId, swap.id, day, period, date, swap.makeup);
       Store.popSwap(classId, day, period, date);
     } else {
-      Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, date);
+      const partnerDate = swap.partnerDate || date;
+      Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, partnerDate);
       Store.popSwap(classId, day, period, date);
     }
     ModalUI.close();
@@ -407,7 +411,7 @@ const SwapUI = (() => {
           <label>보강 교시<input type="text" id="f-makeup-period-display" disabled></label>
           <label>비고<input type="text" id="f-makeup-note" value="${existingMakeup ? TimetableUI.escapeHtml(existingMakeup.note) : ''}"></label>
         </div>
-        <p class="sheet-hint">보강 과목·교시는 위에서 고른 대체 과목과 동일하게 자동으로 채워집니다. 보강 일자만 정해주세요.</p>
+        <p class="sheet-hint">보강 교시는 위에서 고른 대체 과목이 있는 교시로 자동으로 채워지고, 보강 날짜에는 원래 결강됐던 과목("${TimetableUI.escapeHtml(previousEffective.subject)} · ${TimetableUI.escapeHtml(previousEffective.teacher)}")이 그대로 보강 표시됩니다. 보강 일자만 정해주세요.</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btn-save">저장</button>
@@ -481,44 +485,57 @@ const SwapUI = (() => {
         Store.pushSwap(classId, day, period, swapDate, record);
       }
 
-      if (record.makeup) upsertMakeupMarker(classId, record.id, day, period, swapDate, record.makeup, { subject, teacher });
+      // 보강은 대체 과목이 있는 교시를 "빌려서" 진행되지만, 보강에서 실제로 가르치는 내용은 그 교시에
+      // 대신 들어온 대체 과목이 아니라 원래 결강됐던 과목(previousEffective)이다.
+      if (record.makeup) upsertMakeupMarker(classId, record.id, day, period, swapDate, record.makeup, previousEffective);
       ModalUI.close();
       TimetableUI.renderDaily();
       showLogToast(record.logId);
     });
   }
 
+  function exchangeCandidates(classId, targetDay, targetDate, excludeDay, excludePeriod) {
+    const periodCount = Store.get().settings.periodCount;
+    const opts = [];
+    for (let p = 1; p <= periodCount; p++) {
+      if (targetDay === excludeDay && p === excludePeriod) continue;
+      const b = Store.getBaseCell(classId, targetDay, p);
+      const s = Store.getSwap(classId, targetDay, p, targetDate);
+      const eff = s || b;
+      if (eff) opts.push({ period: p, base: eff });
+    }
+    return opts;
+  }
+
+  function exchangeOptionsHtml(candidates) {
+    if (!candidates.length) return `<option value="">교체할 과목이 없습니다</option>`;
+    return candidates.map(c =>
+      `<option value="${c.period}">${c.period}교시 · ${TimetableUI.escapeHtml(c.base.subject)} · ${TimetableUI.escapeHtml(c.base.teacher)}</option>`
+    ).join('');
+  }
+
   function openExchangeModal(classId, day, period, date) {
     const base = Store.getBaseCell(classId, day, period);
     const currentSwap = Store.getSwap(classId, day, period, date);
     const effective = currentSwap || base;
-    const periodCount = Store.get().settings.periodCount;
-    const candidates = [];
-    for (let p = 1; p <= periodCount; p++) {
-      if (p === period) continue;
-      const b = Store.getBaseCell(classId, day, p);
-      const s = Store.getSwap(classId, day, p, date);
-      const eff = s || b;
-      if (eff) candidates.push({ period: p, base: eff });
-    }
-    if (!candidates.length) {
-      alert('같은 요일에 과목이 등록된 다른 교시가 없습니다. 먼저 다른 교시에 과목을 추가해주세요.');
-      return;
-    }
 
-    const optionsHtml = candidates.map(c =>
-      `<option value="${c.period}">${c.period}교시 · ${TimetableUI.escapeHtml(c.base.subject)} · ${TimetableUI.escapeHtml(c.base.teacher)}</option>`
-    ).join('');
+    const initialCandidates = exchangeCandidates(classId, day, date, day, period);
 
     const html = `
-      <div class="modal-header"><h3>${className(classId)} · ${formatShortDate(date)}(${DAY_NAMES[day]}) ${period}교시 - 같은 날 교체</h3>
+      <div class="modal-header"><h3>${className(classId)} · ${formatShortDate(date)}(${DAY_NAMES[day]}) ${period}교시 - 다른 교시와 교체</h3>
         <button class="btn-close" data-close>✕</button></div>
       <div class="modal-body">
         <p class="sheet-current">기존: ${TimetableUI.escapeHtml(effective.subject)} · ${TimetableUI.escapeHtml(effective.teacher)}</p>
-        <label>바꿀 교시 (같은 ${DAY_NAMES[day]}요일)
-          <select id="f-target-period">${optionsHtml}</select>
+        <div class="form-grid">
+          <label>바꿀 요일
+            <select id="f-target-day">${DAY_NAMES.map((d, i) => `<option value="${i}" ${i === day ? 'selected' : ''}>${d}요일</option>`).join('')}</select>
+          </label>
+          <label>바꿀 날짜<input type="date" id="f-target-date" value="${date}"></label>
+        </div>
+        <label>바꿀 교시
+          <select id="f-target-period">${exchangeOptionsHtml(initialCandidates)}</select>
         </label>
-        <p class="sheet-hint">같은 날 두 교시끼리 맞바꾸는 경우로, 별도의 수업 교체일지는 작성되지 않습니다.</p>
+        <p class="sheet-hint">같은 날이든 다른 날이든, 두 교시끼리 서로 맞바꾸는 경우로 별도의 수업 교체일지는 작성되지 않습니다.</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btn-save">교체</button>
@@ -526,24 +543,51 @@ const SwapUI = (() => {
     `;
     ModalUI.open(html);
 
+    function refreshTargetPeriod() {
+      const targetDay = Number(document.getElementById('f-target-day').value);
+      const targetDate = document.getElementById('f-target-date').value;
+      const cands = exchangeCandidates(classId, targetDay, targetDate, day, period);
+      document.getElementById('f-target-period').innerHTML = exchangeOptionsHtml(cands);
+    }
+
+    document.getElementById('f-target-day').addEventListener('change', (e) => {
+      const targetDay = Number(e.target.value);
+      const currentTargetDate = document.getElementById('f-target-date').value || date;
+      document.getElementById('f-target-date').value = nearestDateForWeekday(currentTargetDate, targetDay);
+      refreshTargetPeriod();
+    });
+    document.getElementById('f-target-date').addEventListener('change', refreshTargetPeriod);
+
     document.getElementById('btn-save').addEventListener('click', () => {
       const swapDate = date;
-      const targetPeriod = Number(document.getElementById('f-target-period').value);
-      if (Store.getSwap(classId, day, targetPeriod, swapDate)) {
+      const targetDay = Number(document.getElementById('f-target-day').value);
+      const targetDate = document.getElementById('f-target-date').value;
+      const targetPeriodVal = document.getElementById('f-target-period').value;
+      if (!targetDate) { alert('바꿀 날짜를 입력해주세요.'); return; }
+      if (!targetPeriodVal) { alert('바꿀 교시를 선택해주세요. (그 요일·날짜에 교체할 과목이 없다면 다른 요일/날짜를 골라주세요.)'); return; }
+      const targetPeriod = Number(targetPeriodVal);
+
+      if (targetDay === day && targetDate === swapDate && targetPeriod === period) {
+        alert('지금 교체하려는 교시 자신은 대상으로 고를 수 없습니다.');
+        return;
+      }
+      if (Store.getSwap(classId, targetDay, targetPeriod, targetDate)) {
         alert('이미 해당 날짜에 교체 기록이 있는 교시입니다. 먼저 기존 교체를 취소해주세요.');
         return;
       }
-      const targetBase = Store.getBaseCell(classId, day, targetPeriod);
+      const targetEffective = Store.getBaseCell(classId, targetDay, targetPeriod);
+      if (!targetEffective) { alert('그 교시에는 과목이 없습니다.'); return; }
+
       const swapId = uid();
       Store.pushSwap(classId, day, period, swapDate, {
         id: swapId, type: 'exchange', date: swapDate,
-        subject: targetBase.subject, teacher: targetBase.teacher,
-        partnerDay: day, partnerPeriod: targetPeriod
+        subject: targetEffective.subject, teacher: targetEffective.teacher,
+        partnerDay: targetDay, partnerPeriod: targetPeriod, partnerDate: targetDate
       });
-      Store.pushSwap(classId, day, targetPeriod, swapDate, {
-        id: swapId, type: 'exchange', date: swapDate,
+      Store.pushSwap(classId, targetDay, targetPeriod, targetDate, {
+        id: swapId, type: 'exchange', date: targetDate,
         subject: effective.subject, teacher: effective.teacher,
-        partnerDay: day, partnerPeriod: period
+        partnerDay: day, partnerPeriod: period, partnerDate: swapDate
       });
       ModalUI.close();
       TimetableUI.renderDaily();

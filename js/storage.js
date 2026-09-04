@@ -208,12 +208,37 @@ const Store = (() => {
   }
 
   function resetSemester() {
-    state.classes.forEach(cls => { state.swaps[cls.id] = {}; });
+    state.classes.forEach(cls => {
+      state.swaps[cls.id] = {};
+      state.timetables[cls.id] = {};
+    });
     save();
   }
 
   function setPeriodCount(n) {
     state.settings.periodCount = n;
+    save();
+  }
+
+  // 이 브라우저(기기)의 데이터를 JSON 문자열로 내보낸다. 다른 PC/브라우저로 파일을 옮겨
+  // importState로 불러오면 그 기기에서도 동일한 데이터를 이어서 쓸 수 있다.
+  function exportState() {
+    return JSON.stringify(state, null, 2);
+  }
+
+  // 내보낸 JSON을 불러와 현재 데이터를 완전히 대체한다. 형식이 올바르지 않으면 아무것도
+  // 바꾸지 않고 에러를 던진다(호출부에서 사용자에게 안내).
+  function importState(jsonStr) {
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      throw new Error('올바른 JSON 파일이 아닙니다.');
+    }
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.classes)) {
+      throw new Error('이 앱에서 내보낸 파일이 아닌 것 같습니다.');
+    }
+    state = { ...defaultState(), ...parsed };
     save();
   }
 
@@ -247,6 +272,7 @@ const Store = (() => {
     getBaseCell, setBaseCell, removeBaseCell,
     getSwap, getSwapChain, getSwapsForCell, pushSwap, replaceLastSwap, popSwap, removeSwap, updateSwapInChain, resetSemester,
     setPeriodCount,
+    exportState, importState,
     addLog, getLog, updateLog, removeLog
   };
 })();
