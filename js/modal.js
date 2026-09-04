@@ -16,6 +16,10 @@ const ModalUI = (() => {
     content().innerHTML = '';
   }
 
+  function isOpen() {
+    return overlay().classList.contains('active');
+  }
+
   function init() {
     overlay().addEventListener('click', (e) => {
       if (e.target === overlay()) close();
@@ -25,5 +29,5 @@ const ModalUI = (() => {
     });
   }
 
-  return { open, close, init };
+  return { open, close, isOpen, init };
 })();

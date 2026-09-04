@@ -32,6 +32,7 @@ const AppUI = (() => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
     document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
+    document.getElementById('btn-sync').addEventListener('click', SyncUI.openModal);
     document.getElementById('btn-new-log').addEventListener('click', () => {
       const log = SwapLog.createBlank();
       SwapLog.openDetail(log.id);
@@ -79,6 +80,7 @@ const AppUI = (() => {
       alert('시간표가 초기화되었습니다.');
     });
     TimetableUI.renderBase();
+    SyncUI.init();
   }
 
   return { switchTab, init };

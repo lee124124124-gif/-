@@ -3,6 +3,7 @@ const Store = (() => {
   migrateLegacyTimetable();
   migrateEmbeddedSwaps();
   migrateSwapChains();
+  const changeListeners = [];
 
   function load() {
     try {
@@ -86,6 +87,20 @@ const Store = (() => {
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    changeListeners.forEach(fn => fn(state));
+  }
+
+  // 다른 기기에서 온 동기화 데이터를 그대로 반영한다(로컬 변경이 아니므로 changeListeners를
+  // 호출하지 않는다 — 그러지 않으면 받은 데이터를 다시 서버로 밀어올리는 무한 루프가 생긴다).
+  function applyRemoteState(remoteState) {
+    state = { ...defaultState(), ...remoteState };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  // state가 바뀔 때마다(save() 호출 시) 알림을 받는다. 동기화 모듈이 이걸로 변경 사항을
+  // 감지해 서버에 반영한다.
+  function onChange(fn) {
+    changeListeners.push(fn);
   }
 
   function get() {
@@ -267,7 +282,7 @@ const Store = (() => {
   }
 
   return {
-    get, save,
+    get, save, onChange, applyRemoteState,
     getClasses, getActiveClassId, setActiveClassId, addClass, renameClass, removeClass,
     getBaseCell, setBaseCell, removeBaseCell,
     getSwap, getSwapChain, getSwapsForCell, pushSwap, replaceLastSwap, popSwap, removeSwap, updateSwapInChain, resetSemester,

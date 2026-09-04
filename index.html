@@ -13,6 +13,7 @@
       <h1 class="app-title">📚 수업 교체 관리</h1>
       <div class="header-actions">
         <button class="btn btn-sm" id="btn-settings">⚙ 시간표 설정</button>
+        <button class="btn btn-sm" id="btn-sync">🔌 동기화</button>
         <button class="btn btn-sm" id="btn-export">⬇ 내보내기</button>
         <button class="btn btn-sm" id="btn-import">⬆ 가져오기</button>
         <input type="file" id="f-import-file" accept="application/json" hidden>
@@ -53,9 +54,12 @@
 
   <div class="toast" id="toast"></div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="js/constants.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/modal.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/timetable.js"></script>
   <script src="js/swaplog.js"></script>
   <script src="js/swap.js"></script>
