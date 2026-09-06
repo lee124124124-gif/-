@@ -155,10 +155,38 @@ const SyncUI = (() => {
     }
   }
 
+  // 이 기기에 저장된 시간표가 하나도 없는(=처음 켜는) 상태라면, 조용히 빈 시간표로 시작하는 대신
+  // "다른 기기에서 쓰던 걸 이어서 볼지" 먼저 물어본다. 동기화 기능을 몰라서 못 쓰는 일을 줄이기 위함.
+  function promptFirstRunIfNeeded() {
+    if (Store.getClasses().length > 0) return; // 이미 뭔가 만든 적 있는 기기는 건드리지 않는다
+    const html = `
+      <div class="modal-header"><h3>👋 처음 오셨나요?</h3></div>
+      <div class="modal-body">
+        <p class="sheet-hint">다른 PC에서 이미 이 앱으로 작업하고 계셨다면, 그 기기에서 만든 동기화 코드를
+        입력해 작업하시던 내용을 그대로 이어서 볼 수 있습니다. 처음 쓰시는 거라면 그냥 새로 시작하세요.</p>
+        <label>기존 작업 코드가 있다면 입력<input type="text" id="f-firstrun-code" placeholder="예: AB3D-4KXZ"></label>
+        <button class="btn btn-primary btn-block" id="btn-firstrun-join" style="margin-top:8px;">이 코드로 이어서 작업하기</button>
+        <button class="btn btn-block" id="btn-firstrun-skip" style="margin-top:8px;">새로 시작하기</button>
+      </div>
+    `;
+    ModalUI.open(html);
+    document.getElementById('btn-firstrun-skip').addEventListener('click', ModalUI.close);
+    document.getElementById('btn-firstrun-join').addEventListener('click', () => {
+      const c = document.getElementById('f-firstrun-code').value.trim();
+      if (!c) return;
+      connectExisting(c);
+      ModalUI.close();
+    });
+  }
+
   function init() {
     Store.onChange(() => { if (!applyingRemote) schedulePush(); });
     const saved = localStorage.getItem(WORKSPACE_KEY);
-    if (saved) attach(saved);
+    if (saved) {
+      attach(saved);
+    } else {
+      promptFirstRunIfNeeded();
+    }
   }
 
   return { init, openModal };
