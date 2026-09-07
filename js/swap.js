@@ -183,7 +183,8 @@ const SwapUI = (() => {
     const chain = Store.getSwapChain(classId, day, period, date);
 
     if (isExchange) {
-      const beforeLatest = base || (chain.length > 1 ? chain[chain.length - 2] : null);
+      // 두 번 이상 바뀐 자리라면 기본 시간표 과목이 아니라 "직전 교체 결과"에 취소선을 그어야 한다.
+      const beforeLatest = chain.length > 1 ? chain[chain.length - 2] : base;
       const beforeLatestText = beforeLatest
         ? `${TimetableUI.escapeHtml(beforeLatest.subject)} · ${TimetableUI.escapeHtml(beforeLatest.teacher)}`
         : '(빈 교시)';

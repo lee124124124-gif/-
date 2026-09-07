@@ -93,6 +93,13 @@ const TimetableUI = (() => {
     });
   }
 
+  // 마지막 교체 "직전"에 이 자리에 실제로 표시되던 내용.
+  // 두 번 이상 교체됐다면 취소선을 그을 대상은 기본 시간표 과목이 아니라 "직전 교체 결과"다.
+  // (예: 수학 → 영어 → 과학 이면, 마지막 화면은 "~~영어~~ → 과학" 이어야 한다)
+  function previousEffectiveOf(chain, base) {
+    return chain.length > 1 ? chain[chain.length - 2] : base;
+  }
+
   function renderDailyRow(classId, dayIdx, period, date) {
     const base = Store.getBaseCell(classId, dayIdx, period);
     const swap = Store.getSwap(classId, dayIdx, period, date);
@@ -103,8 +110,10 @@ const TimetableUI = (() => {
     }
 
     if (swap && swap.type === 'makeup') {
-      const displacedLine = base
-        ? `<div class="daily-before">${escapeHtml(base.subject)} · ${escapeHtml(base.teacher)}</div>`
+      // 보강이 놓이기 직전에 이 자리에 있던 내용(그 사이 교체가 있었다면 그 결과)을 취소선으로 보여준다.
+      const displaced = previousEffectiveOf(Store.getSwapChain(classId, dayIdx, period, date), base);
+      const displacedLine = displaced
+        ? `<div class="daily-before">${escapeHtml(displaced.subject)} · ${escapeHtml(displaced.teacher)}</div>`
         : '';
       return `<div class="daily-row daily-makeup clickable" data-period="${period}">
         ${periodLabel}
@@ -121,9 +130,10 @@ const TimetableUI = (() => {
       const makeupNote = (swap.type === 'substitute' && swap.makeup && swap.makeup.date)
         ? `<div class="daily-makeup-note">📘 ${escapeHtml(formatShortDate(swap.makeup.date))} 보강 예정</div>` : '';
       const chain = Store.getSwapChain(classId, dayIdx, period, date);
-      const chainCount = swap.type === 'substitute' ? chain.length : 1;
-      const chainNote = chainCount > 1 ? `<div class="daily-chain-note">이 날짜에 ${chainCount}번 교체됨</div>` : '';
-      const before = base || (chain.length > 1 ? chain[chain.length - 2] : null);
+      // 대체·맞바꾸기를 가리지 않고 실제로 바뀐 횟수를 센다(보강 표시는 교체가 아니므로 제외).
+      const changeCount = chain.filter(s => s.type !== 'makeup').length;
+      const chainNote = changeCount > 1 ? `<div class="daily-chain-note">이 날짜에 ${changeCount}번 교체됨</div>` : '';
+      const before = previousEffectiveOf(chain, base);
       const beforeText = before ? escapeHtml(before.subject) + ' · ' + escapeHtml(before.teacher) : '(빈 교시)';
       // 표시 순서: (1) 취소선 그은 기존 과목 → (2) 언제 보강인지 → (3) 교체돼 들어온 과목.
       // 보강 일자가 없는 교체(맞바꾸기 등)에서는 (2) 자리에 교체 표시를 대신 보여준다.
