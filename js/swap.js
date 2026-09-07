@@ -295,8 +295,9 @@ const SwapUI = (() => {
       Store.popSwap(classId, day, period, date);
     } else {
       const partnerDate = swap.partnerDate || date;
-      Store.popSwap(classId, swap.partnerDay, swap.partnerPeriod, partnerDate);
-      Store.popSwap(classId, day, period, date);
+      // 상대 교시가 그 뒤에 또 교체됐을 수 있으므로 같은 id의 항목만 정확히 지운다.
+      Store.removeSwapById(classId, swap.partnerDay, swap.partnerPeriod, partnerDate, swap.id);
+      Store.removeSwapById(classId, day, period, date, swap.id);
     }
     ModalUI.close();
     TimetableUI.renderDaily();
@@ -571,12 +572,21 @@ const SwapUI = (() => {
         alert('지금 교체하려는 교시 자신은 대상으로 고를 수 없습니다.');
         return;
       }
-      if (Store.getSwap(classId, targetDay, targetPeriod, targetDate)) {
-        alert('이미 해당 날짜에 교체 기록이 있는 교시입니다. 먼저 기존 교체를 취소해주세요.');
+      // 이미 교체(다른 날짜와의 맞바꿈 포함)된 교시도 대상으로 고를 수 있다. 이때 맞바꾸는 내용은
+      // 원래(기본) 과목이 아니라 그 날짜에 지금 실제로 그 자리에 있는 과목이어야 한다 —
+      // 목록에 보여준 내용과 실제로 바뀌는 내용이 같아야 하기 때문이다.
+      const targetSwap = Store.getSwap(classId, targetDay, targetPeriod, targetDate);
+      const targetEffective = targetSwap || Store.getBaseCell(classId, targetDay, targetPeriod);
+      if (!targetEffective) { alert('그 교시에는 과목이 없습니다.'); return; }
+
+      // 지금 이 교시와 이미 맞바꾼 상대를 또 대상으로 고르면 사실상 되돌리기라 혼란스럽다.
+      if (currentSwap && currentSwap.type === 'exchange'
+          && currentSwap.partnerDay === targetDay
+          && currentSwap.partnerPeriod === targetPeriod
+          && (currentSwap.partnerDate || date) === targetDate) {
+        alert('이미 이 교시와 맞바꾼 상대입니다. 되돌리시려면 "교체 취소"를 사용해주세요.');
         return;
       }
-      const targetEffective = Store.getBaseCell(classId, targetDay, targetPeriod);
-      if (!targetEffective) { alert('그 교시에는 과목이 없습니다.'); return; }
 
       const swapId = uid();
       Store.pushSwap(classId, day, period, swapDate, {

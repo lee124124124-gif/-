@@ -242,6 +242,20 @@ const Store = (() => {
     return popped;
   }
 
+  // 체인에서 특정 id의 항목만 골라 지운다. 맞바꾸기를 되돌릴 때 상대 교시가 그 뒤에 또 교체돼
+  // 마지막 항목이 다른 것으로 바뀌어 있을 수 있으므로, 무조건 마지막을 빼면 엉뚱한 교체가 지워진다.
+  function removeSwapById(classId, dayIdx, period, date, swapId) {
+    const key = cellKey(dayIdx, period);
+    const chain = state.swaps[classId] && state.swaps[classId][key] && state.swaps[classId][key][date];
+    if (!Array.isArray(chain)) return null;
+    const idx = chain.findIndex(s => s.id === swapId);
+    if (idx < 0) return null;
+    const [removed] = chain.splice(idx, 1);
+    if (chain.length === 0) delete state.swaps[classId][key][date];
+    save();
+    return removed;
+  }
+
   function updateSwapInChain(classId, dayIdx, period, date, swapId, patchFn) {
     const chain = getSwapChain(classId, dayIdx, period, date);
     const entry = chain.find(s => s.id === swapId);
@@ -322,7 +336,7 @@ const Store = (() => {
     get, save, onChange, applyRemoteState,
     getClasses, getActiveClassId, setActiveClassId, addClass, renameClass, removeClass,
     getBaseCell, setBaseCell, removeBaseCell,
-    getSwap, getSwapChain, getSwapsForCell, pushSwap, replaceLastSwap, popSwap, removeSwap, updateSwapInChain, resetSemester,
+    getSwap, getSwapChain, getSwapsForCell, pushSwap, replaceLastSwap, popSwap, removeSwap, removeSwapById, updateSwapInChain, resetSemester,
     setPeriodCount,
     exportState, importState,
     addLog, getLog, updateLog, removeLog
