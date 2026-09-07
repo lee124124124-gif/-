@@ -1,9 +1,16 @@
 // 여러 PC/브라우저 간 실시간 동기화. Firebase Realtime Database에 "작업 코드"(workspace code)
-// 단위로 전체 데이터를 저장/구독한다. 로그인 없이 코드만 아는 기기끼리 공유하는 방식이라
-// 완전한 보안은 아니지만(코드를 아는 사람은 누구나 접근 가능), 수업 시간표 정도의 민감하지
-// 않은 데이터에는 충분하다고 보고 이렇게 구현했다.
+// 단위로 전체 데이터를 저장/구독한다.
+//
+// 기본 동작: 아무 설정 없이 사이트에 접속하기만 하면 공용 작업공간(DEFAULT_WORKSPACE)에 자동으로
+// 연결되어, 접속하는 모든 기기가 같은 시간표를 실시간으로 함께 본다. 코드 입력·버튼 클릭이 필요 없다.
+// 대신 이 사이트 주소를 아는 사람은 누구나 같은 데이터를 보고 수정할 수 있다(사용자가 이 방식을
+// 명시적으로 선택함 — 로그인 없이 "어느 PC에서 열어도 그대로"를 만들려면 이 방법뿐이다).
 const SyncUI = (() => {
   const WORKSPACE_KEY = 'classSwapApp.workspaceCode';
+  const DISABLED_KEY = 'classSwapApp.syncDisabled';
+  const BACKUP_KEY = 'classSwapApp.localBackup';
+  // 코드 입력 없이 모든 기기가 자동으로 만나는 공용 작업공간 경로
+  const DEFAULT_WORKSPACE = 'ljh-class-swap-main';
   const firebaseConfig = {
     apiKey: "AIzaSyACVRIhkAWhGdsfzt3yVoqTdv1berWVlHA",
     authDomain: "class-change.firebaseapp.com",
@@ -38,7 +45,20 @@ const SyncUI = (() => {
   function updateButton() {
     const btn = document.getElementById('btn-sync');
     if (!btn) return;
-    btn.textContent = code ? `🔗 동기화됨 (${code})` : '🔌 동기화';
+    if (!code) btn.textContent = '🔌 동기화 꺼짐';
+    else if (code === DEFAULT_WORKSPACE) btn.textContent = '🔗 자동 동기화 중';
+    else btn.textContent = `🔗 동기화됨 (${code})`;
+  }
+
+  // 원격 데이터를 이 기기에 처음 덮어쓰기 직전에, 이 기기에 있던 내용을 한 번 백업해 둔다.
+  // 자동 연결 방식에서는 사용자가 모르는 사이 로컬 데이터가 공용 데이터로 대체될 수 있으므로
+  // 최소한의 안전장치를 둔다.
+  function backupLocalOnce() {
+    if (localStorage.getItem(BACKUP_KEY)) return;
+    try {
+      const cur = Store.exportState();
+      if (JSON.parse(cur).classes.length) localStorage.setItem(BACKUP_KEY, cur);
+    } catch (e) { /* 백업 실패가 동기화를 막지는 않도록 무시 */ }
   }
 
   function rerenderIfIdle() {
@@ -68,8 +88,13 @@ const SyncUI = (() => {
       if (first) {
         first = false;
         if (onFirstValue) onFirstValue(remote);
+        // 공용 작업공간이 아직 비어 있고 이 기기에는 시간표가 있다면, 이 기기 내용으로 채운다.
+        // (빈 기기가 먼저 접속해 빈 데이터를 올려서 다른 기기 내용을 지우는 일을 막기 위해,
+        //  데이터가 있는 기기만 시드로 올린다.)
+        if (!remote && Store.getClasses().length > 0) { pushNow(); return; }
       }
       if (!remote) return;
+      backupLocalOnce();
       applyingRemote = true;
       Store.applyRemoteState(remote);
       rerenderIfIdle();
@@ -109,26 +134,39 @@ const SyncUI = (() => {
   }
 
   function disconnect() {
-    if (!confirm('동기화를 끊을까요?\n\n이 기기에 있는 데이터는 그대로 남지만, 앞으로는 다른 기기와 자동으로 공유되지 않습니다.')) return;
+    if (!confirm('동기화를 끊을까요?\n\n이 기기에 있는 데이터는 그대로 남지만, 앞으로는 다른 기기와 자동으로 공유되지 않습니다.\n(이 기기에서만 꺼지며, 다시 켤 수 있습니다.)')) return;
     localStorage.removeItem(WORKSPACE_KEY);
+    localStorage.setItem(DISABLED_KEY, '1');
     detach();
+  }
+
+  function reconnectDefault() {
+    localStorage.removeItem(DISABLED_KEY);
+    attach(DEFAULT_WORKSPACE);
   }
 
   function openModal() {
     const html = code ? `
       <div class="modal-header"><h3>🔗 여러 기기 동기화</h3><button class="btn-close" data-close>✕</button></div>
       <div class="modal-body">
-        <p class="sheet-current">현재 작업 코드: <strong>${code}</strong></p>
-        <p class="sheet-hint">이 코드를 다른 기기의 "🔌 동기화"에서 입력하면, 그 기기도 지금부터 이 기기와 실시간으로 같은
-        시간표·교체 기록을 함께 봅니다. 코드는 비밀번호처럼 잘 보관하세요(코드를 아는 사람은 누구나 접근할 수 있습니다).</p>
-        <button class="btn btn-danger btn-block" id="btn-sync-disconnect">동기화 끊기</button>
+        ${code === DEFAULT_WORKSPACE ? `
+          <p class="sheet-current"><strong>자동 동기화가 켜져 있습니다.</strong></p>
+          <p class="sheet-hint">이 사이트에 접속하는 모든 기기가 코드 입력 없이 자동으로 같은 시간표·교체 기록을
+          함께 봅니다. 어느 PC에서 수정하든 다른 PC 화면에도 바로 반영됩니다.<br><br>
+          ⚠ 이 사이트 주소를 아는 사람은 누구나 같은 내용을 보고 수정할 수 있으니, 주소 공유에 주의하세요.</p>
+        ` : `
+          <p class="sheet-current">현재 작업 코드: <strong>${code}</strong></p>
+          <p class="sheet-hint">이 코드를 입력한 기기끼리만 실시간으로 같은 내용을 함께 봅니다.</p>
+        `}
+        <button class="btn btn-danger btn-block" id="btn-sync-disconnect">이 기기에서 동기화 끄기</button>
       </div>
     ` : `
       <div class="modal-header"><h3>🔗 여러 기기 동기화</h3><button class="btn-close" data-close>✕</button></div>
       <div class="modal-body">
-        <p class="sheet-hint">동기화를 켜면 이 기기의 데이터가 온라인에 올라가고, 같은 코드를 입력한 다른 기기와
-        실시간으로 자동 공유됩니다.</p>
-        <button class="btn btn-primary btn-block" id="btn-sync-new">새 작업 코드 만들고 이 기기 데이터로 시작</button>
+        <p class="sheet-hint">현재 이 기기는 동기화가 꺼져 있어 데이터가 이 기기에만 저장됩니다.</p>
+        <button class="btn btn-primary btn-block" id="btn-sync-default">자동 동기화 다시 켜기</button>
+        <p class="sheet-hint" style="margin-top:14px;">또는 특정 기기끼리만 공유하는 별도 코드를 쓸 수도 있습니다.</p>
+        <button class="btn btn-block" id="btn-sync-new">새 작업 코드 만들고 이 기기 데이터로 시작</button>
         <label style="margin-top:14px;display:block;">다른 기기에서 만든 코드 입력
           <input type="text" id="f-sync-code" placeholder="예: AB3D-4KXZ">
         </label>
@@ -140,6 +178,7 @@ const SyncUI = (() => {
     if (code) {
       document.getElementById('btn-sync-disconnect').addEventListener('click', () => { disconnect(); ModalUI.close(); });
     } else {
+      document.getElementById('btn-sync-default').addEventListener('click', () => { reconnectDefault(); ModalUI.close(); });
       document.getElementById('btn-sync-new').addEventListener('click', () => {
         const c = createNew();
         ModalUI.close();
@@ -155,38 +194,11 @@ const SyncUI = (() => {
     }
   }
 
-  // 이 기기에 저장된 시간표가 하나도 없는(=처음 켜는) 상태라면, 조용히 빈 시간표로 시작하는 대신
-  // "다른 기기에서 쓰던 걸 이어서 볼지" 먼저 물어본다. 동기화 기능을 몰라서 못 쓰는 일을 줄이기 위함.
-  function promptFirstRunIfNeeded() {
-    if (Store.getClasses().length > 0) return; // 이미 뭔가 만든 적 있는 기기는 건드리지 않는다
-    const html = `
-      <div class="modal-header"><h3>👋 처음 오셨나요?</h3></div>
-      <div class="modal-body">
-        <p class="sheet-hint">다른 PC에서 이미 이 앱으로 작업하고 계셨다면, 그 기기에서 만든 동기화 코드를
-        입력해 작업하시던 내용을 그대로 이어서 볼 수 있습니다. 처음 쓰시는 거라면 그냥 새로 시작하세요.</p>
-        <label>기존 작업 코드가 있다면 입력<input type="text" id="f-firstrun-code" placeholder="예: AB3D-4KXZ"></label>
-        <button class="btn btn-primary btn-block" id="btn-firstrun-join" style="margin-top:8px;">이 코드로 이어서 작업하기</button>
-        <button class="btn btn-block" id="btn-firstrun-skip" style="margin-top:8px;">새로 시작하기</button>
-      </div>
-    `;
-    ModalUI.open(html);
-    document.getElementById('btn-firstrun-skip').addEventListener('click', ModalUI.close);
-    document.getElementById('btn-firstrun-join').addEventListener('click', () => {
-      const c = document.getElementById('f-firstrun-code').value.trim();
-      if (!c) return;
-      connectExisting(c);
-      ModalUI.close();
-    });
-  }
-
   function init() {
     Store.onChange(() => { if (!applyingRemote) schedulePush(); });
-    const saved = localStorage.getItem(WORKSPACE_KEY);
-    if (saved) {
-      attach(saved);
-    } else {
-      promptFirstRunIfNeeded();
-    }
+    if (localStorage.getItem(DISABLED_KEY)) { updateButton(); return; } // 사용자가 이 기기에서 끈 경우
+    // 저장된 코드가 없으면 공용 작업공간에 자동으로 연결한다 → 어느 PC에서 열어도 같은 화면.
+    attach(localStorage.getItem(WORKSPACE_KEY) || DEFAULT_WORKSPACE);
   }
 
   return { init, openModal };
