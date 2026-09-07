@@ -28,10 +28,13 @@ const SwapUI = (() => {
     if (!makeup || !makeup.date || !makeup.period) return;
     const mDay = dateToWeekdayIndex(makeup.date);
     if (mDay < 0) return;
-    const marker = Store.getSwap(classId, mDay, Number(makeup.period), makeup.date);
-    if (marker && marker.type === 'makeup' && marker.sourceSwapId === sourceSwapId) {
-      Store.removeSwap(classId, mDay, Number(makeup.period), makeup.date);
-    }
+    const mPeriod = Number(makeup.period);
+    // 보강 표시가 체인 중간에 있을 수도 있으므로 체인 전체에서 찾고, 그 항목 하나만 지운다.
+    // (예전에는 마지막 항목만 확인했고, 지울 때 그 날짜의 체인을 통째로 삭제해서
+    //  같은 자리에 있던 다른 교체 기록까지 함께 날아갔다)
+    const chain = Store.getSwapChain(classId, mDay, mPeriod, makeup.date);
+    const marker = chain.find(s => s.type === 'makeup' && s.sourceSwapId === sourceSwapId);
+    if (marker) Store.removeSwapById(classId, mDay, mPeriod, makeup.date, marker.id);
   }
 
   function upsertMakeupMarker(classId, sourceSwapId, sourceDay, sourcePeriod, sourceDate, makeup, effective) {
@@ -39,17 +42,20 @@ const SwapUI = (() => {
     const mDay = dateToWeekdayIndex(makeup.date);
     if (mDay < 0) return;
     const mPeriod = Number(makeup.period);
-    const occupant = Store.getSwap(classId, mDay, mPeriod, makeup.date);
-    const isOwnMarker = occupant && occupant.type === 'makeup' && occupant.sourceSwapId === sourceSwapId;
-    if (occupant && !isOwnMarker) return;
+    const chain = Store.getSwapChain(classId, mDay, mPeriod, makeup.date);
+    const own = chain.find(s => s.type === 'makeup' && s.sourceSwapId === sourceSwapId);
     const record = {
-      id: isOwnMarker ? occupant.id : uid(), type: 'makeup', date: makeup.date,
+      id: own ? own.id : uid(), type: 'makeup', date: makeup.date,
       subject: effective.subject, teacher: effective.teacher,
       sourceDay, sourcePeriod, sourceDate, sourceSwapId, note: makeup.note || ''
     };
-    if (isOwnMarker) {
-      Store.replaceLastSwap(classId, mDay, mPeriod, makeup.date, record);
+    if (own) {
+      // 이 결강에 이미 연결된 보강 표시가 있으면 그 자리에서 내용만 갱신한다.
+      Store.updateSwapInChain(classId, mDay, mPeriod, makeup.date, own.id, s => Object.assign(s, record));
     } else {
+      // 보강할 자리에 이미 다른 교체·보강이 있어도 체인에 이어붙인다.
+      // (예전에는 자리가 비어있지 않으면 조용히 포기해서, 이미 교체된 교시로 보강을 잡으면
+      //  보강이 아예 기록되지 않았다 — 화면에도 교체일지에도 아무 흔적이 남지 않았다)
       Store.pushSwap(classId, mDay, mPeriod, makeup.date, record);
     }
   }
@@ -277,7 +283,8 @@ const SwapUI = (() => {
     if (swap.type === 'makeup') {
       if (!confirm('보강 표시를 취소할까요? 연결된 결강 수업의 교체 기록은 유지됩니다.')) return;
       clearMakeupLinkFromSource(classId, swap);
-      Store.removeSwap(classId, day, period, date);
+      // 같은 자리에 다른 교체 기록이 함께 있을 수 있으므로 이 보강 표시만 지운다.
+      Store.removeSwapById(classId, day, period, date, swap.id);
       ModalUI.close();
       TimetableUI.renderDaily();
       return;
