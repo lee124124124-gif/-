@@ -10,11 +10,48 @@ const Store = (() => {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
-      return { ...defaultState(), ...parsed };
+      return normalizeState(parsed);
     } catch (e) {
       console.error('저장된 데이터를 불러오지 못했습니다.', e);
       return defaultState();
     }
+  }
+
+  // Firebase Realtime Database는 "빈 배열/빈 객체"를 아예 저장하지 않고 키째로 지운다.
+  // 그래서 행이 0개인 교체일지를 저장했다가 다시 받아오면 log.rows 가 undefined 로 돌아오고,
+  // rows.length 를 읽는 곳(일지 목록 렌더링, 일지 합치기 판단)에서 앱이 통째로 멈춘다.
+  // 또 배열 중간이 비면 {"0":..,"2":..} 같은 객체로 바뀌어 돌아오기도 한다.
+  // 어디서 데이터가 들어오든(로컬 저장소·다른 기기) 이 함수를 거쳐 형태를 바로잡는다.
+  function toArray(v) {
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === 'object') return Object.keys(v).sort((a, b) => a - b).map(k => v[k]);
+    return [];
+  }
+
+  function toObject(v) {
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  }
+
+  function normalizeState(raw) {
+    const s = { ...defaultState(), ...(raw && typeof raw === 'object' ? raw : {}) };
+    s.settings = { ...defaultState().settings, ...toObject(s.settings) };
+    s.classes = toArray(s.classes);
+    s.timetables = toObject(s.timetables);
+    s.swaps = toObject(s.swaps);
+    s.logs = toArray(s.logs).map(log => ({ ...log, rows: toArray(log && log.rows) }));
+    Object.keys(s.timetables).forEach(classId => {
+      s.timetables[classId] = toObject(s.timetables[classId]);
+    });
+    Object.keys(s.swaps).forEach(classId => {
+      const cellMap = toObject(s.swaps[classId]);
+      s.swaps[classId] = cellMap;
+      Object.keys(cellMap).forEach(cell => {
+        const dateMap = toObject(cellMap[cell]);
+        cellMap[cell] = dateMap;
+        Object.keys(dateMap).forEach(date => { dateMap[date] = toArray(dateMap[date]); });
+      });
+    });
+    return s;
   }
 
   function migrateLegacyTimetable() {
@@ -93,7 +130,7 @@ const Store = (() => {
   // 다른 기기에서 온 동기화 데이터를 그대로 반영한다(로컬 변경이 아니므로 changeListeners를
   // 호출하지 않는다 — 그러지 않으면 받은 데이터를 다시 서버로 밀어올리는 무한 루프가 생긴다).
   function applyRemoteState(remoteState) {
-    state = { ...defaultState(), ...remoteState };
+    state = normalizeState(remoteState);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
@@ -253,7 +290,7 @@ const Store = (() => {
     if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.classes)) {
       throw new Error('이 앱에서 내보낸 파일이 아닌 것 같습니다.');
     }
-    state = { ...defaultState(), ...parsed };
+    state = normalizeState(parsed);
     save();
   }
 

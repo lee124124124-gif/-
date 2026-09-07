@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>수업 교체 관리</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=20260907a">
 </head>
 <body>
 
@@ -54,15 +54,19 @@
 
   <div class="toast" id="toast"></div>
 
+  <div id="fatal-error" class="fatal-error" hidden></div>
+
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="js/constants.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/modal.js"></script>
-  <script src="js/sync.js"></script>
-  <script src="js/timetable.js"></script>
-  <script src="js/swaplog.js"></script>
-  <script src="js/swap.js"></script>
-  <script src="js/app.js"></script>
+  <!-- ?v= 는 캐시 무효화용. JS 파일을 고칠 때마다 이 값을 함께 올려서, 브라우저가 예전 파일과
+       새 파일을 섞어 쓰다가 앱이 시작조차 못 하는 일을 막는다. -->
+  <script src="js/constants.js?v=20260907a"></script>
+  <script src="js/storage.js?v=20260907a"></script>
+  <script src="js/modal.js?v=20260907a"></script>
+  <script src="js/sync.js?v=20260907a"></script>
+  <script src="js/timetable.js?v=20260907a"></script>
+  <script src="js/swaplog.js?v=20260907a"></script>
+  <script src="js/swap.js?v=20260907a"></script>
+  <script src="js/app.js?v=20260907a"></script>
 </body>
 </html>

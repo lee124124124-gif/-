@@ -134,6 +134,12 @@ body {
 .log-row-edit { border: 1px solid #e8ebf0; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
 .log-row-edit-title { font-size: 13px; font-weight: 600; color: #556; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
 
+.fatal-error {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+  background: #fdeceb; color: #a01f18; border-bottom: 2px solid #d0342c;
+  padding: 12px 16px; font-size: 13px; white-space: pre-line; line-height: 1.5;
+}
+
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   background: #222; color: #fff; padding: 12px 18px; border-radius: 8px;

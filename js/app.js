@@ -1,4 +1,22 @@
 const AppUI = (() => {
+  // 화면에 아무 반응이 없는 대신, 무슨 오류인지 눈에 보이게 띄운다.
+  // (예전에는 초기화 중 오류가 나면 버튼이 조용히 먹통이 됐다)
+  function showFatal(msg) {
+    const box = document.getElementById('fatal-error');
+    if (!box) return;
+    box.hidden = false;
+    box.textContent = `⚠ 오류가 발생했습니다: ${msg}\n브라우저를 새로고침(Ctrl+Shift+R)해도 계속되면 이 문구를 알려주세요.`;
+  }
+
+  // 요소가 없거나 핸들러가 터져도 나머지 초기화가 멈추지 않도록 감싼다.
+  function on(id, evt, fn) {
+    const el = document.getElementById(id);
+    if (!el) { console.error(`화면 요소를 찾을 수 없습니다: #${id}`); return; }
+    el.addEventListener(evt, (...args) => {
+      try { fn(...args); } catch (e) { console.error(e); showFatal(e.message); }
+    });
+  }
+
   function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
@@ -31,13 +49,13 @@ const AppUI = (() => {
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
-    document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
-    document.getElementById('btn-sync').addEventListener('click', SyncUI.openModal);
-    document.getElementById('btn-new-log').addEventListener('click', () => {
+    on('btn-settings', 'click', openSettingsModal);
+    on('btn-sync', 'click', () => SyncUI.openModal());
+    on('btn-new-log', 'click', () => {
       const log = SwapLog.createBlank();
       SwapLog.openDetail(log.id);
     });
-    document.getElementById('btn-export').addEventListener('click', () => {
+    on('btn-export', 'click', () => {
       const json = Store.exportState();
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -50,10 +68,10 @@ const AppUI = (() => {
       a.remove();
       URL.revokeObjectURL(url);
     });
-    document.getElementById('btn-import').addEventListener('click', () => {
+    on('btn-import', 'click', () => {
       document.getElementById('f-import-file').click();
     });
-    document.getElementById('f-import-file').addEventListener('change', (e) => {
+    on('f-import-file', 'change', (e) => {
       const file = e.target.files[0];
       e.target.value = '';
       if (!file) return;
@@ -72,7 +90,7 @@ const AppUI = (() => {
       };
       reader.readAsText(file);
     });
-    document.getElementById('btn-reset-semester').addEventListener('click', () => {
+    on('btn-reset-semester', 'click', () => {
       if (!confirm('학기말 초기화를 진행할까요?\n\n모든 학급의 기본 시간표(과목·담당 선생님)와 "수업 교체" 기록이 모두 삭제되어 빈 시간표로 돌아갑니다(학급 자체는 남아있습니다).\n이미 작성된 수업 교체일지 문서는 삭제되지 않습니다.')) return;
       Store.resetSemester();
       TimetableUI.renderBase();
@@ -80,10 +98,22 @@ const AppUI = (() => {
       alert('시간표가 초기화되었습니다.');
     });
     TimetableUI.renderBase();
-    SyncUI.init();
+    try { SyncUI.init(); } catch (e) { console.error(e); showFatal('동기화 시작 실패: ' + e.message); }
   }
 
-  return { switchTab, init };
+  return { switchTab, init, showFatal };
 })();
 
-document.addEventListener('DOMContentLoaded', AppUI.init);
+// 어떤 이유로든 앱이 뜨다가 멈추면, 조용히 먹통이 되는 대신 화면에 오류를 보여준다.
+window.addEventListener('error', (e) => {
+  AppUI.showFatal((e.error && e.error.message) || e.message || '알 수 없는 오류');
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    AppUI.init();
+  } catch (e) {
+    console.error(e);
+    AppUI.showFatal('앱 시작 실패: ' + e.message);
+  }
+});
