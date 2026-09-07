@@ -230,12 +230,14 @@ const SwapUI = (() => {
         <p class="sheet-current">${trail} (${TimetableUI.escapeHtml(swap.reason)})</p>
         ${chainHint}
         <button class="btn btn-block btn-primary" data-act="again">🔁 또 교체하기</button>
+        <button class="btn btn-block" data-act="exchange">🔀 다른 교시와 교체</button>
         <button class="btn btn-block" data-act="edit-swap">✏ 교체 내용 수정</button>
         <button class="btn btn-block btn-danger" data-act="revert">↩ 마지막 교체 취소</button>
       </div>
     `;
     ModalUI.open(html);
     document.querySelector('[data-act="again"]').addEventListener('click', () => openSwapModal(classId, day, period, date, false));
+    document.querySelector('[data-act="exchange"]').addEventListener('click', () => openExchangeModal(classId, day, period, date));
     document.querySelector('[data-act="edit-swap"]').addEventListener('click', () => openSwapModal(classId, day, period, date, true));
     document.querySelector('[data-act="revert"]').addEventListener('click', () => revertSwap(classId, day, period, date));
   }
