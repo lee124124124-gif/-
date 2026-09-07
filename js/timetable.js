@@ -119,19 +119,22 @@ const TimetableUI = (() => {
     if (swap) {
       const typeIcon = swap.type === 'exchange' ? '🔀' : '🔁';
       const makeupNote = (swap.type === 'substitute' && swap.makeup && swap.makeup.date)
-        ? `<div class="daily-makeup-note">📘 보강 ${escapeHtml(formatShortDate(swap.makeup.date))}</div>` : '';
+        ? `<div class="daily-makeup-note">📘 ${escapeHtml(formatShortDate(swap.makeup.date))} 보강 예정</div>` : '';
       const chain = Store.getSwapChain(classId, dayIdx, period, date);
       const chainCount = swap.type === 'substitute' ? chain.length : 1;
       const chainNote = chainCount > 1 ? `<div class="daily-chain-note">이 날짜에 ${chainCount}번 교체됨</div>` : '';
       const before = base || (chain.length > 1 ? chain[chain.length - 2] : null);
       const beforeText = before ? escapeHtml(before.subject) + ' · ' + escapeHtml(before.teacher) : '(빈 교시)';
+      // 표시 순서: (1) 취소선 그은 기존 과목 → (2) 언제 보강인지 → (3) 교체돼 들어온 과목.
+      // 보강 일자가 없는 교체(맞바꾸기 등)에서는 (2) 자리에 교체 표시를 대신 보여준다.
+      const middleLine = makeupNote
+        || `<div class="daily-badge">${typeIcon} ${escapeHtml(formatShortDate(swap.date))} 교체</div>`;
       return `<div class="daily-row daily-swapped clickable" data-period="${period}">
         ${periodLabel}
         <div class="daily-content">
           <div class="daily-before">${beforeText}</div>
-          <div class="daily-badge">${typeIcon} ${escapeHtml(formatShortDate(swap.date))} 교체</div>
+          ${middleLine}
           <div class="daily-after">${escapeHtml(swap.subject)} · ${escapeHtml(swap.teacher)}</div>
-          ${makeupNote}
           ${chainNote}
         </div>
       </div>`;

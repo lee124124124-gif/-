@@ -58,7 +58,7 @@ body {
 .daily-swapped .daily-before { color: #b8860b; text-decoration: line-through; font-size: 12px; }
 .daily-swapped .daily-badge { font-size: 11px; color: #c07f00; margin: 2px 0; }
 .daily-swapped .daily-after { font-weight: 700; font-size: 15px; color: #7a4a00; }
-.daily-swapped .daily-makeup-note { font-size: 11px; color: #2b6ef2; margin-top: 3px; }
+.daily-swapped .daily-makeup-note { font-size: 12px; color: #2b6ef2; margin: 3px 0; }
 .daily-swapped .daily-chain-note { font-size: 11px; color: #a06a00; margin-top: 3px; }
 
 .daily-makeup { background: #eaf1ff; border-color: #c7d9f7; }
