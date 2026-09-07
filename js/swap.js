@@ -324,12 +324,29 @@ const SwapUI = (() => {
     return opts;
   }
 
-  function findDayForSubject(classId, subject, teacher, date, excludeDay, excludePeriod) {
+  function findDayForSubject(classId, subject, teacher, viewDate, excludeDay, excludePeriod, preferredDate) {
     if (!subject) return -1;
     for (let d = 0; d < DAY_NAMES.length; d++) {
-      if (subjectOptionsForDay(classId, d, date, excludeDay, excludePeriod).some(o => o.subject === subject && o.teacher === teacher)) return d;
+      // 요일마다 그 요일에 해당하는 실제 날짜로 조회해야 그 날 교체된 내용까지 찾을 수 있다.
+      const dayDate = (preferredDate && dateToWeekdayIndex(preferredDate) === d)
+        ? preferredDate
+        : nearestDateForWeekday(viewDate, d);
+      if (subjectOptionsForDay(classId, d, dayDate, excludeDay, excludePeriod).some(o => o.subject === subject && o.teacher === teacher)) return d;
     }
     return -1;
+  }
+
+  // 대체할 과목 목록을 "어느 날짜" 기준으로 보여줄지 정한다.
+  // 보강 일자를 정했고 그 요일이 고른 요일과 같으면 그 날짜를 쓴다 — 실제로 그 수업을 빌려오는 날이
+  // 보강 일자이므로, 그 날 이미 교체된 과목이 후보에 그대로 나와야 한다.
+  // 아직 안 정했으면 고른 요일에 해당하는 같은 주 날짜를 쓴다.
+  // (예전에는 지금 보고 있는 날짜로만 조회해서, 다른 요일의 교체 내용이 전혀 반영되지 않았다.
+  //  교체 기록은 (요일·교시·날짜)로 저장되므로 요일이 다른 날짜로 조회하면 항상 빈 값이 나온다.)
+  function resolveSourceDate(sourceDay, viewDate) {
+    const mk = document.getElementById('f-makeup-date');
+    const mkVal = mk ? mk.value : '';
+    if (mkVal && dateToWeekdayIndex(mkVal) === sourceDay) return mkVal;
+    return nearestDateForWeekday(viewDate, sourceDay);
   }
 
   function refreshSubjectSelect(classId, dayIdx, presetSubject, presetTeacher, fallbackPeriod, date, excludeDay, excludePeriod) {
@@ -387,7 +404,11 @@ const SwapUI = (() => {
       : (latestSwap || base);
     const existingMakeup = existing && existing.makeup;
     const initialSourceDay = existing
-      ? (() => { const found = findDayForSubject(classId, existing.subject, existing.teacher, date, day, period); return found >= 0 ? found : day; })()
+      ? (() => {
+        const found = findDayForSubject(classId, existing.subject, existing.teacher, date, day, period,
+          existingMakeup ? existingMakeup.date : '');
+        return found >= 0 ? found : day;
+      })()
       : day;
 
     const html = `
@@ -403,6 +424,7 @@ const SwapUI = (() => {
           </label>
         </div>
         <label>대체할 과목<select id="f-subject-select"></select></label>
+        <p class="sheet-hint">아래 <b>보강 일자</b>를 정하면, 그 날짜에 실제로 진행되는 과목(그날 이미 교체된 과목 포함)으로 이 목록이 다시 채워집니다.</p>
         <div id="manual-fields" class="form-grid" style="display:none">
           <label>대체 과목(직접 입력)<input type="text" id="f-subject-manual"></label>
           <label>대체 교사(직접 입력)<input type="text" id="f-teacher-manual"></label>
@@ -422,9 +444,33 @@ const SwapUI = (() => {
     `;
     ModalUI.open(html, 'modal-wide');
 
-    refreshSubjectSelect(classId, initialSourceDay, existing ? existing.subject : '', existing ? existing.teacher : '', period, date, day, period);
+    refreshSubjectSelect(classId, initialSourceDay, existing ? existing.subject : '', existing ? existing.teacher : '',
+      period, resolveSourceDate(initialSourceDay, date), day, period);
+
     document.getElementById('f-source-day').addEventListener('change', (e) => {
-      refreshSubjectSelect(classId, Number(e.target.value), '', '', period, date, day, period);
+      const sourceDay = Number(e.target.value);
+      // 보강 일자를 이미 정해뒀는데 요일이 어긋나면, 그 요일에 맞는 날짜로 따라가게 한다.
+      const mk = document.getElementById('f-makeup-date');
+      if (mk.value && dateToWeekdayIndex(mk.value) !== sourceDay) {
+        mk.value = nearestDateForWeekday(mk.value, sourceDay);
+      }
+      refreshSubjectSelect(classId, sourceDay, '', '', period, resolveSourceDate(sourceDay, date), day, period);
+    });
+
+    // 보강 일자를 정하면 그 날짜에 실제로 있는 과목(그날 이미 교체된 과목 포함)이 후보로 채워진다.
+    document.getElementById('f-makeup-date').addEventListener('change', (e) => {
+      const mkDay = dateToWeekdayIndex(e.target.value);
+      if (mkDay < 0) return; // 주말 등 요일을 특정할 수 없으면 목록은 그대로 둔다
+      const daySel = document.getElementById('f-source-day');
+      // 요일이 그대로면 고르던 과목을 유지하고, 요일이 바뀌면 그 날 후보 중 첫 번째로 새로 고른다.
+      // (요일이 바뀌었는데 이전 선택을 남기면 그 과목이 새 요일에 없어 조용히 "직접 입력"으로
+      //  넘어가 버려, 목록에 없는 과목이 저장되는 사고가 난다.)
+      const sameDay = Number(daySel.value) === mkDay;
+      const prev = document.getElementById('f-subject-select').value;
+      const keep = (sameDay && prev && prev !== MANUAL_VALUE) ? prev.split('||') : null;
+      daySel.value = String(mkDay);
+      refreshSubjectSelect(classId, mkDay, keep ? keep[1] : '', keep ? keep[2] : '',
+        period, resolveSourceDate(mkDay, date), day, period);
     });
     document.getElementById('f-subject-select').addEventListener('change', (e) => {
       toggleManualFields(e.target.value === MANUAL_VALUE);
