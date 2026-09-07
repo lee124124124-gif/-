@@ -119,6 +119,12 @@ body {
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .form-grid-makeup { background: #f7f9fc; padding: 10px; border-radius: 8px; margin-top: 8px; }
 
+.btn-link {
+  border: none; background: none; padding: 4px 0; margin-top: 2px;
+  color: #2b6ef2; font-size: 12px; cursor: pointer; text-decoration: underline;
+}
+.btn-link:hover { color: #1f5cd8; }
+
 .sheet-body .sheet-current { color: #556; font-size: 13px; margin-bottom: 12px; }
 .sheet-hint { color: #889; font-size: 12px; margin: -4px 0 12px; }
 

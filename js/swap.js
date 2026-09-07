@@ -529,16 +529,21 @@ const SwapUI = (() => {
         <button class="btn-close" data-close>✕</button></div>
       <div class="modal-body">
         <p class="sheet-current">기존: ${TimetableUI.escapeHtml(effective.subject)} · ${TimetableUI.escapeHtml(effective.teacher)}</p>
-        <div class="form-grid">
-          <label>바꿀 요일
-            <select id="f-target-day">${DAY_NAMES.map((d, i) => `<option value="${i}" ${i === day ? 'selected' : ''}>${d}요일</option>`).join('')}</select>
-          </label>
-          <label>바꿀 날짜<input type="date" id="f-target-date" value="${date}"></label>
+        <!-- 대부분은 같은 날 교체이므로 요일·날짜는 접어두고, 다른 날짜와 바꿀 때만 펼친다.
+             (숨겨져 있어도 값은 지금 보고 있는 날짜로 채워져 있어 저장 로직은 그대로 동작한다) -->
+        <div id="cross-day-fields" hidden>
+          <div class="form-grid">
+            <label>바꿀 요일
+              <select id="f-target-day">${DAY_NAMES.map((d, i) => `<option value="${i}" ${i === day ? 'selected' : ''}>${d}요일</option>`).join('')}</select>
+            </label>
+            <label>바꿀 날짜<input type="date" id="f-target-date" value="${date}"></label>
+          </div>
         </div>
         <label>바꿀 교시
           <select id="f-target-period">${exchangeOptionsHtml(initialCandidates)}</select>
         </label>
-        <p class="sheet-hint">같은 날이든 다른 날이든, 두 교시끼리 서로 맞바꾸는 경우로 별도의 수업 교체일지는 작성되지 않습니다.</p>
+        <button type="button" class="btn-link" id="btn-toggle-cross-day">📅 다른 날짜의 교시와 바꾸기</button>
+        <p class="sheet-hint">같은 날 ${formatShortDate(date)}(${DAY_NAMES[day]}) 안에서 두 교시를 서로 맞바꿉니다. 맞바꾸기는 결강이 아니므로 수업 교체일지는 작성되지 않습니다.</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btn-save">교체</button>
@@ -552,6 +557,11 @@ const SwapUI = (() => {
       const cands = exchangeCandidates(classId, targetDay, targetDate, day, period);
       document.getElementById('f-target-period').innerHTML = exchangeOptionsHtml(cands);
     }
+
+    document.getElementById('btn-toggle-cross-day').addEventListener('click', (e) => {
+      document.getElementById('cross-day-fields').hidden = false;
+      e.target.remove(); // 한 번 펼치면 링크는 감춘다
+    });
 
     document.getElementById('f-target-day').addEventListener('change', (e) => {
       const targetDay = Number(e.target.value);
