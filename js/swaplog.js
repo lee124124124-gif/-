@@ -84,6 +84,10 @@ const SwapLog = (() => {
     const log = Store.getLog(logId);
     if (!log) return;
     Store.updateLog(logId, l => { l.rows = l.rows.filter(r => r.id !== rowId); });
+    // 교체를 취소하면 그 일지도 함께 사라지도록, 행이 하나도 남지 않은 일지는 문서째 삭제한다.
+    // (여러 교체가 한 일지에 묶여 있으면 마지막 행이 빠질 때만 삭제된다)
+    const after = Store.getLog(logId);
+    if (after && after.rows.length === 0) Store.removeLog(logId);
   }
 
   function createBlank() {
