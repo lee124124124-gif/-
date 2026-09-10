@@ -98,6 +98,9 @@ const SwapLog = (() => {
       periodEnd: todayStr(),
       absentTeacher: '',
       note: '',
+      // 사용자가 "+ 새 일지"로 직접 만든 일지라는 표시. 이런 일지는 행이 0개여도
+      // 자동 정리 대상에서 제외한다(직접 만든 빈 일지가 사라지면 곤란하므로).
+      manual: true,
       rows: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -114,6 +117,7 @@ const SwapLog = (() => {
 
   function renderList() {
     const container = document.getElementById('log-list-container');
+    Store.pruneEmptyLogs(); // 어떤 경로로 생겼든 0행 일지는 목록에 남기지 않는다
     const logs = Store.get().logs;
     if (logs.length === 0) {
       container.innerHTML = '<p class="empty-hint">아직 작성된 수업 교체 일지가 없습니다. 시간표에서 수업을 교체하면 자동으로 만들어집니다.</p>';

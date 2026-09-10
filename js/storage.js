@@ -332,6 +332,19 @@ const Store = (() => {
     save();
   }
 
+  // 행이 하나도 없는 교체일지를 정리한다. 교체를 취소하면 그 일지도 사라지는 것이 원칙인데,
+  // 일지 편집 화면에서 행을 지운 경우나, 예전 버전에서 만들어져 남아 있는 경우, 또는 오래된
+  // 탭이 옛 데이터를 다시 올린 경우처럼 다른 경로로도 0행 일지가 생길 수 있어 여기서 한 번 더 거른다.
+  // "+ 새 일지"로 직접 만든 일지(manual)는 아직 작성 중일 수 있으므로 건드리지 않는다.
+  // 반환값: 실제로 지운 개수(0이면 save를 부르지 않아 불필요한 동기화를 만들지 않는다).
+  function pruneEmptyLogs() {
+    const before = state.logs.length;
+    state.logs = state.logs.filter(l => l.manual || (l.rows && l.rows.length > 0));
+    const removed = before - state.logs.length;
+    if (removed) save();
+    return removed;
+  }
+
   return {
     get, save, onChange, applyRemoteState,
     getClasses, getActiveClassId, setActiveClassId, addClass, renameClass, removeClass,
@@ -339,6 +352,6 @@ const Store = (() => {
     getSwap, getSwapChain, getSwapsForCell, pushSwap, replaceLastSwap, popSwap, removeSwap, removeSwapById, updateSwapInChain, resetSemester,
     setPeriodCount,
     exportState, importState,
-    addLog, getLog, updateLog, removeLog
+    addLog, getLog, updateLog, removeLog, pruneEmptyLogs
   };
 })();
